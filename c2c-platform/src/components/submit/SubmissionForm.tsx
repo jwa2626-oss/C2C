@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload, X, FileAudio, CheckCircle, Loader } from "lucide-react";
+import { Upload, X, FileAudio, CheckCircle, Loader, Mic, Square } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 type Step = "details" | "participants" | "survey" | "upload" | "submitting" | "done";
@@ -41,6 +41,101 @@ const EMPLOYMENT = [
   "Unemployed", "Retired", "Student", "Unable to work",
   "Looking after home/family", "Prefer not to say",
 ];
+
+function AudioRecorder({ onFile }: { onFile: (f: File) => void }) {
+  const [recState, setRecState] = useState<"idle" | "recording" | "done">("idle");
+  const [seconds, setSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fmt = (s: number) =>
+    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+  const start = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      chunksRef.current = [];
+
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType });
+        const ext = mr.mimeType.includes("ogg") ? "ogg" : "webm";
+        const file = new File([blob], `recording-${Date.now()}.${ext}`, {
+          type: mr.mimeType,
+        });
+        onFile(file);
+        setRecState("done");
+      };
+
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setRecState("recording");
+      setSeconds(0);
+      timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
+    } catch {
+      alert("Could not access microphone. Please check your browser permissions.");
+    }
+  };
+
+  const stop = () => {
+    mediaRecorderRef.current?.stop();
+    if (timerRef.current) clearInterval(timerRef.current);
+  };
+
+  if (recState === "recording") {
+    return (
+      <div className="flex items-center gap-3 p-4 rounded-lg bg-rose-50 border border-rose-200">
+        <div className="w-3 h-3 rounded-full bg-rose-500 animate-pulse shrink-0" />
+        <span className="text-sm font-medium text-rose-700">
+          Recording — {fmt(seconds)}
+        </span>
+        <button
+          type="button"
+          onClick={stop}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 text-white text-sm rounded-lg hover:bg-rose-700 transition-colors"
+        >
+          <Square className="w-3.5 h-3.5" />
+          Stop
+        </button>
+      </div>
+    );
+  }
+
+  if (recState === "done") {
+    return (
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+        <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+        <span className="text-sm font-medium text-emerald-800">
+          Recording captured — ready to submit
+        </span>
+        <button
+          type="button"
+          onClick={() => setRecState("idle")}
+          className="ml-auto text-xs text-emerald-600 hover:underline"
+        >
+          Re-record
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={start}
+      className="w-full flex items-center justify-center gap-2 p-5 rounded-lg border-2 border-dashed border-gray-300 hover:border-rose-400 hover:bg-rose-50 transition-colors text-sm font-medium text-gray-600 hover:text-rose-600"
+    >
+      <Mic className="w-5 h-5" />
+      Record directly in browser
+    </button>
+  );
+}
 
 function AudioDropzone({
   label,
@@ -501,22 +596,69 @@ export function SubmissionForm() {
         {/* Step 4: Upload audio */}
         {step === "upload" && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">Upload audio files</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Audio recording</h2>
             <p className="text-sm text-gray-500">
-              Upload up to two audio recordings from this conversation.
+              Record directly in the browser, or upload an existing file. Audio never
+              saves to your device — it goes straight to the server.
             </p>
-            <AudioDropzone
-              label="Audio file 1"
-              file={form.audioFile1}
-              onFile={set("audioFile1")}
-              onRemove={() => set("audioFile1")(null)}
-            />
-            <AudioDropzone
-              label="Audio file 2 (optional)"
-              file={form.audioFile2}
-              onFile={set("audioFile2")}
-              onRemove={() => set("audioFile2")(null)}
-            />
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Recording 1
+              </p>
+              {!form.audioFile1 ? (
+                <>
+                  <AudioRecorder onFile={set("audioFile1")} />
+                  <div className="flex items-center gap-3 text-xs text-gray-400">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    or upload a file
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+                  <AudioDropzone
+                    label="Upload audio file"
+                    file={null}
+                    onFile={set("audioFile1")}
+                    onRemove={() => set("audioFile1")(null)}
+                  />
+                </>
+              ) : (
+                <AudioDropzone
+                  label="Audio file 1"
+                  file={form.audioFile1}
+                  onFile={set("audioFile1")}
+                  onRemove={() => set("audioFile1")(null)}
+                />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Recording 2 <span className="font-normal normal-case">(optional)</span>
+              </p>
+              {!form.audioFile2 ? (
+                <>
+                  <AudioRecorder onFile={set("audioFile2")} />
+                  <div className="flex items-center gap-3 text-xs text-gray-400">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    or upload a file
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+                  <AudioDropzone
+                    label="Upload audio file (optional)"
+                    file={null}
+                    onFile={set("audioFile2")}
+                    onRemove={() => set("audioFile2")(null)}
+                  />
+                </>
+              ) : (
+                <AudioDropzone
+                  label="Audio file 2 (optional)"
+                  file={form.audioFile2}
+                  onFile={set("audioFile2")}
+                  onRemove={() => set("audioFile2")(null)}
+                />
+              )}
+            </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setStep("survey")}
