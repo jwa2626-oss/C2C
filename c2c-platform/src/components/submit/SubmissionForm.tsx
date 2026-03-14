@@ -1,9 +1,47 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Upload, X, FileAudio, CheckCircle, Loader, Mic, Square } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+const DRAFT_KEY = "c2c_submission_draft";
+
+type DraftFields = {
+  listenerName: string;
+  date: string;
+  location: string;
+  town: string;
+  ageGroup: string;
+  gender: string;
+  ethnicity: string;
+  employmentStatus: string;
+  belongingScore: string;
+  participationScore: string;
+  influenceScore: string;
+  prideScore: string;
+};
+
+function saveDraft(fields: DraftFields) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(fields));
+  } catch {}
+}
+
+function loadDraft(): Partial<DraftFields> {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function clearDraft() {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {}
+}
 
 type Step = "details" | "participants" | "survey" | "upload" | "submitting" | "done";
 
@@ -243,6 +281,7 @@ const STEP_LABELS: Record<Step, string> = {
 export function SubmissionForm() {
   const [step, setStep] = useState<Step>("details");
   const [error, setError] = useState<string | null>(null);
+  const [hasDraft, setHasDraft] = useState(false);
   const [form, setForm] = useState<FormData>({
     listenerName: "",
     date: "",
@@ -259,6 +298,21 @@ export function SubmissionForm() {
     audioFile1: null,
     audioFile2: null,
   });
+
+  // Restore draft on first load
+  useEffect(() => {
+    const draft = loadDraft();
+    if (Object.values(draft).some(Boolean)) {
+      setForm((f) => ({ ...f, ...draft }));
+      setHasDraft(true);
+    }
+  }, []);
+
+  // Save text fields to localStorage whenever they change (files cannot be serialised)
+  useEffect(() => {
+    const { audioFile1: _1, audioFile2: _2, ...fields } = form;
+    saveDraft(fields);
+  }, [form]);
 
   const set = (key: keyof FormData) => (val: string | File | null) =>
     setForm((f) => ({ ...f, [key]: val }));
@@ -352,6 +406,7 @@ export function SubmissionForm() {
         body: JSON.stringify({ conversationId: conversation.id }),
       });
 
+      clearDraft();
       setStep("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -382,6 +437,31 @@ export function SubmissionForm() {
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* Draft restored banner */}
+      {hasDraft && (
+        <div className="flex items-center gap-3 px-6 pt-4 pb-0">
+          <div className="flex-1 flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <span>Your previous answers have been restored.</span>
+            <button
+              type="button"
+              onClick={() => {
+                clearDraft();
+                setForm({
+                  listenerName: "", date: "", location: "", town: "",
+                  ageGroup: "", gender: "", ethnicity: "", employmentStatus: "",
+                  belongingScore: "", participationScore: "", influenceScore: "",
+                  prideScore: "", audioFile1: null, audioFile2: null,
+                });
+                setHasDraft(false);
+              }}
+              className="ml-auto text-xs underline hover:no-underline shrink-0"
+            >
+              Start fresh
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Progress bar */}
       <div className="px-6 pt-6 pb-4">
         <div className="flex items-center gap-2">
