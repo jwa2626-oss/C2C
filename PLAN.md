@@ -4,6 +4,10 @@
 moments that usually live across five different apps, a spreadsheet, and a pile of
 paper.
 
+**Launch region: United Kingdom.** All tax rules, local-area data sources,
+currency defaults, and terminology target the UK first. The rules-as-data design
+(see §4) keeps other regions cheap to add later.
+
 ---
 
 ## 1. Vision & Goals
@@ -68,8 +72,9 @@ Core money management without needing to be a full banking app on day one.
   split tracking ("who owes whom") for house-shares.
 - Reports: monthly spend breakdown, category trends, month-on-month comparison.
 
-**Later (Phase 3+)**: open-banking integration (Plaid / TrueLayer) for automatic
-transaction import and categorisation; net-worth tracking.
+**Later (Phase 3+)**: UK Open Banking integration (TrueLayer or GoCardless Bank
+Account Data) for automatic transaction import and categorisation; net-worth
+tracking.
 
 ### 2.3 Household Chores (diarised)
 
@@ -107,54 +112,72 @@ The spine of the app — everything with a date lands here.
   every year".
 - Agenda, week, and month views; "next 7 days" widget on the dashboard.
 
-### 2.5 Tax Calculator
+### 2.5 Tax Calculator (UK)
 
 Quick answers to "what will I actually take home?" and "what do I owe?"
 
 **Features**
-- Income tax & take-home pay calculator: salary in → net pay out, with breakdown
-  of income tax, social/national insurance, pension contributions, and student
-  loan repayments.
-- Region-aware rule packs (start with one region — e.g. UK or US — behind a
-  config-driven rules engine so other regions can be added without code rewrites;
-  tax-year versioned so historical years remain correct).
-- Self-employment estimator: rough tax set-aside guidance for freelancers
-  ("put aside ~£X per invoice").
+- Take-home pay calculator: gross salary in → net pay out, with a full breakdown
+  of Income Tax, National Insurance, pension contributions (relief-at-source and
+  salary sacrifice), and student loan repayments (Plans 1, 2, 4, 5 and
+  postgraduate loans).
+- UK-specific handling: personal allowance taper above £100k, Scottish income
+  tax bands vs. rest-of-UK, tax code entry (e.g. 1257L), Marriage Allowance,
+  child benefit High Income Charge warning.
+- Rule packs versioned by tax year (2026/27, 2025/26…) behind a config-driven
+  rules engine — historical years stay correct, and other regions can be added
+  later without code rewrites.
+- Self Assessment estimator for freelancers/self-employed: rough tax + Class 4
+  NI set-aside guidance ("put aside ~£X per invoice"), payments on account
+  explained and forecast.
 - Scenario comparison: "what if I get a £3k raise?", "what if I increase pension
-  contributions to 8%?"
-- Key tax dates (filing deadlines, payment-on-account dates) pushed to the calendar.
-- Clear disclaimer: estimates only, not financial advice.
+  contributions to 8%?", "what if I salary-sacrifice an EV?"
+- Key HMRC dates pushed to the calendar: 31 January (Self Assessment filing &
+  balancing payment), 31 July (second payment on account), 5 April (tax year
+  end — ISA/pension allowance reminders), P60/P11D season.
+- Clear disclaimer: estimates only, not financial or tax advice.
 
-### 2.6 Mortgage Calculator
+### 2.6 Mortgage Calculator (UK)
 
 **Features**
 - Repayment calculator: loan amount, rate, term → monthly payment, total interest,
-  full amortisation schedule (chart + table).
-- Affordability estimator: income + deposit → indicative borrowing range.
+  full amortisation schedule (chart + table); repayment vs. interest-only.
+- Affordability estimator: income + deposit → indicative borrowing range
+  (typical UK 4.5× income multiples, stress-tested at higher rates).
+- **Stamp Duty (SDLT) calculator**, with Scottish LBTT and Welsh LTT variants,
+  first-time-buyer relief, and additional-property surcharge.
 - Overpayment modeller: "pay £100/month extra → mortgage-free 4 years earlier,
-  save £X interest".
-- Remortgage comparison: current deal vs. a new rate, including fees and the
-  cost of doing nothing when a fixed rate ends.
+  save £X interest" — with a warning about typical 10% annual ERC-free limits.
+- Remortgage comparison: current deal vs. a new rate including arrangement fees,
+  and the cost of lapsing onto the lender's SVR when a fixed rate ends.
 - Rent-vs-buy comparison over a chosen horizon.
+- First-time-buyer extras: deposit savings goal linked to the budget module,
+  Lifetime ISA bonus modelling (25% government bonus, £4k/yr cap).
 - Integration hooks: save a scenario, put "fixed rate ends" on the calendar with
   a 6-month-ahead reminder, and feed the monthly payment into the budget module.
 
-### 2.7 What's In My Area
+### 2.7 What's In My Area (UK)
 
-Local context for daily life, driven by the user's saved locations (home, work).
+Local context for daily life, driven by the user's saved postcodes (home, work).
+The UK is unusually rich in open data here — lean on it.
 
 **Features**
-- Nearby essentials: GPs/doctors, dentists, pharmacies, schools, gyms, libraries,
-  recycling centres, supermarkets — with opening hours and contact details
-  (Google Places or OpenStreetMap/Overpass API).
-- **Bin collection days** (where councils publish them) pushed to the calendar.
+- Nearby essentials: GPs, dentists (NHS availability flagged), pharmacies,
+  schools, gyms, libraries, recycling centres (HWRCs), supermarkets — with
+  opening hours and contact details (NHS API for health services; Google Places
+  or OpenStreetMap/Overpass for the rest).
+- **Bin collection days**: council-published schedules pushed to the calendar
+  (many UK councils expose these; postcode → council lookup via GOV.UK, with a
+  manual-schedule fallback where no feed exists).
 - Local events feed: markets, fairs, community events (Eventbrite/council feeds).
-- Area stats for movers: crime stats, school ratings, transport links, broadband
-  availability — doubles as research when using the mortgage module.
+- Area stats for movers — doubles as research alongside the mortgage module:
+  crime stats (data.police.uk), **Ofsted ratings and school catchment info**,
+  transport links (National Rail / TfL APIs), broadband speeds (Ofcom data),
+  flood risk (Environment Agency), council tax band lookup, EPC register.
 - Local services directory: save trusted plumbers, electricians, cleaners with
   notes and last-used dates; tie into home maintenance log.
-- Alerts: severe weather warnings, planned roadworks/utility outages where feeds
-  exist.
+- Alerts: Met Office severe weather warnings, planned roadworks (one.network)
+  and utility outages where feeds exist.
 
 ### 2.8 Additional modules (the "anything else useful")
 
@@ -196,9 +219,10 @@ individual pings), and channel choice (push, email).
   where feasible.
 - No selling of data; local-area features use coarse location by default.
 - Biometric/PIN app lock, with a separate lock on the money and vault modules.
-- Full data export (JSON/CSV) and account deletion (GDPR/CCPA compliant).
+- Full data export (JSON/CSV) and account deletion (UK GDPR / Data Protection
+  Act 2018 compliant; ICO registration).
 - Calculators carry "estimate, not advice" disclaimers; tax rule packs display
-  their tax-year version.
+  their tax-year version (e.g. "2026/27").
 
 ### Offline & sync
 Local-first storage for lists, chores, and calendar with background sync;
@@ -263,8 +287,9 @@ over the other modules plus native events.
 
 1. **Recurrence engine**: one shared RFC 5545 (RRULE)-based engine for chores,
    bills, and events — do not build three.
-2. **Rules-as-data for tax**: tax bands/thresholds live in versioned JSON packs
-   per region and tax year; the engine is generic.
+2. **Rules-as-data for tax**: bands/thresholds live in versioned JSON packs per
+   region and tax year (launching with UK packs, including Scottish bands as a
+   sub-region); the engine is generic.
 3. **Calendar as projection**: modules emit "date-bearing facts"; the calendar
    subscribes. Keeps modules decoupled.
 4. **Local-first clients** with a sync protocol, so the app is instant and works
@@ -276,20 +301,22 @@ over the other modules plus native events.
 
 ### Phase 1 — MVP (~3 months)
 Goal: a genuinely useful daily app for one person.
-- Auth, profiles, onboarding wizard (region, currency, home location, first budget).
+- Auth, profiles, onboarding wizard (home postcode, first budget; GBP and UK
+  tax year 6 Apr–5 Apr as defaults).
 - Dashboard v1.
 - Budgeting: categories, manual expenses, recurring transactions, monthly report.
 - Chores: creation, recurrence, completion, calendar display.
 - Calendar: events, key personal dates with reminders, Google Calendar import.
-- Mortgage calculator (repayment + overpayment).
-- Tax calculator for the launch region (take-home pay).
+- Mortgage calculator (repayment + overpayment + SDLT/LBTT/LTT).
+- UK tax calculator (take-home pay incl. Scottish bands, NI, student loans).
 - Notifications engine v1 (push + digest).
 
 ### Phase 2 — Households & local (~2 months)
 - Household creation, invites, roles; shared chores with rotation and fairness view.
 - Shared budgets and expense splitting.
 - Shopping/to-do lists (shared, real-time).
-- What's In My Area v1: nearby essentials + local events; bin days where available.
+- What's In My Area v1: nearby essentials + local events; council bin days
+  where available (manual schedule fallback).
 - Subscription tracker; bill calendar.
 
 ### Phase 3 — Depth (~3 months)
@@ -297,14 +324,16 @@ Goal: a genuinely useful daily app for one person.
 - Meal planner wired to grocery list and budget.
 - Home maintenance log; life-admin checklists (moving house first).
 - Two-way calendar sync; natural-language quick add.
-- Tax: self-employment estimator, scenario comparison; second region pack.
+- Tax: Self Assessment estimator, scenario comparison; groundwork for a second
+  region pack (e.g. Ireland or US).
 - Mortgage: affordability, remortgage comparison, rent-vs-buy.
 
 ### Phase 4 — Intelligence & integrations
-- Open banking import + auto-categorisation.
+- UK Open Banking import + auto-categorisation (FCA AISP registration or an
+  agent model via TrueLayer/GoCardless).
 - Smart suggestions: "you always buy milk Mondays", seasonal chore prompts,
   "your fixed rate ends in 6 months — here's what a 1% rise costs you".
-- Area alerts (weather, roadworks); school-ratings/crime layers for movers.
+- Area alerts (Met Office weather, roadworks); Ofsted/crime layers for movers.
 - Widgets (iOS/Android home screen), voice-assistant quick add, wearables.
 
 ---
@@ -324,16 +353,19 @@ Goal: a genuinely useful daily app for one person.
 | Risk | Mitigation |
 |---|---|
 | Scope sprawl — "everything app" ships nothing well | Strict phasing; MVP is single-user and manual-entry only |
-| Tax/mortgage figures wrong → user harm + liability | Rules-as-data with golden-file tests per tax year; prominent "estimate only" disclaimers; annual review process |
-| Local data (bin days, events) patchy by region | Degrade gracefully: hide cards where no data; let users add manual schedules |
+| Tax/mortgage figures wrong → user harm + liability | Rules-as-data with golden-file tests per tax year (validated against HMRC examples); prominent "estimate only" disclaimers; refresh packs each Budget/Autumn Statement |
+| Local data (bin days, events) patchy — UK councils have no single API | Degrade gracefully: hide cards where no data; manual schedules as fallback; prioritise councils covering the most users |
 | Household sharing privacy mistakes | Private-by-default; explicit share flows; child role has no finance access; penetration test before Phase 2 launch |
-| Open banking cost/compliance | Deferred to Phase 4; manual + recurring entry is the fallback that always works |
+| Open Banking cost/compliance (FCA AISP permissions) | Deferred to Phase 4; use an agent model via TrueLayer/GoCardless rather than direct authorisation; manual + recurring entry is the fallback that always works |
 | Notification fatigue → uninstalls | Digest-first defaults, per-module controls, "snooze all" |
 
 ## 8. Open Questions
 
-1. **Launch region** for tax rules and local-area data (UK vs. US changes both) —
-   the rules-engine design keeps this cheap to decide late, but marketing can't wait.
+1. ~~Launch region~~ — **decided: UK.** Remaining sub-question: full
+   four-nations coverage at launch (Scottish income tax bands, LBTT/LTT are
+   planned in), or England & Wales first with Scotland/NI fast-follow?
 2. Mobile-first only for MVP, or ship the web app simultaneously?
 3. Should kids' chore gamification be MVP-adjacent (strong family appeal) or Phase 3?
 4. Build vs. buy for the sync layer (e.g. PowerSync/ElectricSQL vs. custom).
+5. Bin-day data strategy: integrate council feeds one-by-one, use an aggregator,
+   or launch with manual schedules and crowdsource council coverage?
